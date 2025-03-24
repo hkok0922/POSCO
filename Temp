@@ -1,21 +1,50 @@
+import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
-# Figure와 첫번째 Axes 생성
-fig, ax1 = plt.subplots(figsize=(10, 6))
+# 1. DATE_TIME 컬럼을 datetime 형식으로 변환 (이미 datetime이면 생략)
+df_comb['DATE_TIME'] = pd.to_datetime(df_comb['DATE_TIME'])
 
-# 첫번째 y축 (왼쪽): 'obs_vol'
-color1 = 'tab:red'
-ax1.set_xlabel('DATE_TIME')
-ax1.set_ylabel('obs_vol', color=color1)
-ax1.plot(df_comb['DATE_TIME'], df_comb['obs_vol'], color=color1)
-ax1.tick_params(axis='y', labelcolor=color1)
+# 2. DATE_TIME 기준으로 정렬 및 인덱스 재설정
+df_comb = df_comb.sort_values('DATE_TIME').reset_index(drop=True)
 
-# 두번째 y축 (오른쪽): 'mod_pred_vol' - 첫번째 축과 x축을 공유
-ax2 = ax1.twinx()
-color2 = 'tab:blue'
-ax2.set_ylabel('mod_pred_vol', color=color2)
-ax2.plot(df_comb['DATE_TIME'], df_comb['mod_pred_vol'], color=color2)
-ax2.tick_params(axis='y', labelcolor=color2)
+# 3. 연속된 시간 간격(초 단위) 계산
+df_comb['diff_sec'] = df_comb['DATE_TIME'].diff().dt.total_seconds()
 
-fig.tight_layout()  # 레이아웃 간격 자동 조정
+# 4. gap 기준 설정: 예를 들어 90초보다 크면 gap으로 판단 (데이터 특성에 맞게 조정)
+threshold = 90
+
+# 5. 연속된 x축을 위한 새로운 컬럼 생성 (단순 인덱스)
+df_comb['x_cont'] = np.arange(len(df_comb))
+
+# 6. moving average (원하는 경우)
+window_size = 10  # 원하는 윈도우 크기로 조정
+df_comb['error_ma'] = df_comb['error'].rolling(window=window_size, min_periods=1).mean()
+
+# 7. gap 발생 위치(인덱스)를 찾음 (첫번째 gap은 diff가 threshold를 초과하는 경우)
+gap_indices = df_comb.index[df_comb['diff_sec'] > threshold].tolist()
+
+# 8. 플롯 생성: x축은 x_cont (연속된 인덱스)로 plot
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df_comb['x_cont'], df_comb['error_ma'], label=f'Error Moving Average (window={window_size})', marker='o')
+
+# 9. gap이 있었던 위치에 수직선과 텍스트 추가
+for idx in gap_indices:
+    # gap은 idx-1와 idx 사이에서 발생하므로 중간값을 x위치로 사용
+    x_gap = (df_comb.loc[idx-1, 'x_cont'] + df_comb.loc[idx, 'x_cont']) / 2
+    ax.axvline(x=x_gap, color='grey', linestyle='--', alpha=0.7)
+    ax.text(x_gap, ax.get_ylim()[1], 'gap joined', color='grey', ha='center', va='top', rotation=90, fontsize=8)
+
+# 10. x축 tick을 원래 DATE_TIME 값을 이용해 지정 (몇 개의 tick만 선택)
+n_ticks = 10  # 표시할 tick 개수 (필요에 따라 조정)
+tick_positions = np.linspace(0, df_comb['x_cont'].iloc[-1], n_ticks, dtype=int)
+tick_labels = df_comb.loc[tick_positions, 'DATE_TIME'].dt.strftime('%Y-%m-%d\n%H:%M')
+ax.set_xticks(tick_positions)
+ax.set_xticklabels(tick_labels)
+
+ax.set_xlabel('DATE_TIME')
+ax.set_ylabel('Error Moving Average')
+ax.legend()
+ax.grid(True)
+plt.tight_layout()
 plt.show()
