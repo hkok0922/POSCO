@@ -1,4 +1,21 @@
-ConversionError: Failed to convert value(s) to axis units: array(['2022-06-05T08:01:00.000000000', '2022-06-05T08:02:00.000000000',
-       '2022-06-05T08:03:00.000000000', ...,
-       '2022-08-01T06:57:00.000000000', '2022-08-01T06:58:00.000000000',
-       '2022-08-01T06:59:00.000000000'], dtype='datetime64[ns]')
+import matplotlib.pyplot as plt
+
+# Figure와 첫번째 Axes 생성
+fig, ax1 = plt.subplots(figsize=(10, 6))
+
+# 첫번째 y축 (왼쪽): 'obs_vol'
+color1 = 'tab:red'
+ax1.set_xlabel('DATE_TIME')
+ax1.set_ylabel('obs_vol', color=color1)
+ax1.plot(df_comb['DATE_TIME'], df_comb['obs_vol'], color=color1)
+ax1.tick_params(axis='y', labelcolor=color1)
+
+# 두번째 y축 (오른쪽): 'mod_pred_vol' - 첫번째 축과 x축을 공유
+ax2 = ax1.twinx()
+color2 = 'tab:blue'
+ax2.set_ylabel('mod_pred_vol', color=color2)
+ax2.plot(df_comb['DATE_TIME'], df_comb['mod_pred_vol'], color=color2)
+ax2.tick_params(axis='y', labelcolor=color2)
+
+fig.tight_layout()  # 레이아웃 간격 자동 조정
+plt.show()
