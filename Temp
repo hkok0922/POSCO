@@ -1,14 +1,22 @@
-fig, ax = plt.subplots()
-ln1 = ax.plot(ns, aic, label="AIC", color="blue", marker="o")
-ln2 = ax.plot(ns, bic, label="BIC", color="green", marker="o")
-ax2 = ax.twinx()
-ln3 = ax2.plot(ns, lls, label="LL", color="orange", marker="o")
+import pandas as pd
 
-ax.legend(handles=ax.lines + ax2.lines)
-ax.set_title("Using AIC/BIC for Model Selection")
-ax.set_ylabel("Criterion Value (lower is better)")
-ax2.set_ylabel("LL (higher is better)")
-ax.set_xlabel("Number of HMM Components")
-fig.tight_layout()
+# 1️⃣  Make sure the timestamp column is datetime
+df_comb['DATE_TIME'] = pd.to_datetime(df_comb['DATE_TIME'])
 
-plt.show()
+# 2️⃣  Shift every timestamp **7 h back** so that 07:00 → 00:00 of the same calendar date
+shifted = df_comb['DATE_TIME'] - pd.Timedelta(hours=7)
+
+# 3️⃣  Take the (shifted) calendar date as the key that identifies each production day
+df_daily_avg = (
+    df_comb
+      .assign(prod_day_start=shifted.dt.floor('D'))          # e.g. 2025‑04‑17 means 2025‑04‑17 07:00 – 2025‑04‑18 06:59
+      .groupby('prod_day_start', as_index=False)['error']
+      .mean()
+      .rename(columns={'error': 'error_avg'})
+)
+
+# 4️⃣  (Optional) Shift the day‑start stamp forward again if you’d rather display 07:00 explicitly
+df_daily_avg['prod_day_start'] = df_daily_avg['prod_day_start'] + pd.Timedelta(hours=7)
+
+print(df_daily_avg.head())
+
