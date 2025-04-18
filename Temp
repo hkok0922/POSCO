@@ -1,36 +1,40 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# --- 1.  prepare the daily table (already done) ------------------------------
-# df_daily_avg has:   prod_day_start (datetime64[ns])   error_avg (float)
-
+# --- 1. assume you already have df_daily_avg and gap_locs ---------------------
 df = (
     df_daily_avg
-    .sort_values('prod_day_start')          # chronological order
+    .sort_values('prod_day_start')
     .reset_index(drop=True)
 )
-
-# --- 2.  detect gaps of ≥ 2 days --------------------------------------------
+df['plot_x'] = range(len(df))
 df['day_diff'] = df['prod_day_start'].diff().dt.days.fillna(1).astype(int)
-gap_locs = df.index[df['day_diff'] >= 2].tolist()    # row indices *after* a gap
+gap_locs = df.index[df['day_diff'] >= 2].tolist()
 
-# --- 3.  compress the timeline (remove missing days) ------------------------
-df['plot_x'] = range(len(df))               # 0, 1, 2, …   ← compressed axis
+# --- 2. pick 10 evenly spaced “major” ticks and add the gap positions ----------
+n = len(df)
+major_ticks = np.linspace(0, n-1, 10, dtype=int)
+tick_positions = sorted(set(major_ticks.tolist() + gap_locs))
 
-# --- 4.  draw ----------------------------------------------------------------
+# --- 3. plot ------------------------------------------------------------------
 fig, ax = plt.subplots(figsize=(12, 5))
 
-ax.plot(df['plot_x'], df['error_avg'],
-        marker='o', linewidth=1.5, label='mean error')
+ax.plot(df['plot_x'], df['error_avg'], marker='o', linewidth=1.5, label='mean error')
 
-# mark every compressed‑out gap
+# red lines at gaps
 for loc in gap_locs:
     ax.axvline(loc - 0.5, color='red', linestyle='--', linewidth=1)
 
-# cosmetic touches
-ax.set_xticks(df['plot_x'])
-ax.set_xticklabels(df['prod_day_start'].dt.strftime('%Y‑%m‑%d'),
-                   rotation=45, ha='right')
+# only show the selected ticks
+ax.set_xticks(tick_positions)
+ax.set_xticklabels(
+    df.loc[tick_positions, 'prod_day_start']
+      .dt.strftime('%Y-%m-%d'),
+    rotation=45,
+    ha='right'
+)
+
 ax.set_xlabel('Production day (07:00 – 06:59)')
 ax.set_ylabel('Error (daily average)')
 ax.set_title('Daily mean error (gaps ≥ 2 days compressed)')
