@@ -1,43 +1,30 @@
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
-# --- 1. assume you already have df_daily_avg and gap_locs ---------------------
-df = (
-    df_daily_avg
-    .sort_values('prod_day_start')
-    .reset_index(drop=True)
-)
-df['plot_x'] = range(len(df))
-df['day_diff'] = df['prod_day_start'].diff().dt.days.fillna(1).astype(int)
-gap_locs = df.index[df['day_diff'] >= 2].tolist()
+# 1) ensure your datetime column is actual datetime
+df['DATE_TIME'] = pd.to_datetime(df['DATE_TIME'])
 
-# --- 2. pick 10 evenly spaced “major” ticks and add the gap positions ----------
-n = len(df)
-major_ticks = np.linspace(0, n-1, 10, dtype=int)
-tick_positions = sorted(set(major_ticks.tolist() + gap_locs))
+# 2) define a “day‐label” that treats 07:00→next 06:59 as one group
+#    by shifting back 7 hours and extracting the date
+df['DATE_TIME_DAY'] = (df['DATE_TIME'] - pd.Timedelta(hours=7)).dt.date
 
-# --- 3. plot ------------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(12, 5))
+# 3) for each day, collect the observations and compute log‐likelihood
+rows = []
+for day, grp in df.groupby('DATE_TIME_DAY'):
+    # extract the series or array you want to score; here ‘col’ can be a
+    # single column name or a list of feature‐columns
+    X = grp[col].values.reshape(-1, 1)
+    ll_per_sample = model.score(X) / len(X)
+    # attach the “nominal” day—if you like, shift it *forward* 7 h so it reads 07:00
+    nominal_day = pd.to_datetime(day) + pd.Timedelta(hours=7)
+    rows.append({
+        'DATE_TIME_DAY': nominal_day,
+        'log_likelihood': ll_per_sample
+    })
 
-ax.plot(df['plot_x'], df['error_avg'], marker='o', linewidth=1.5, label='mean error')
+# 4) build your result DataFrame
+result_df = pd.DataFrame(rows)
 
-# red lines at gaps
-for loc in gap_locs:
-    ax.axvline(loc - 0.5, color='red', linestyle='--', linewidth=1)
+# reorder or sort if you want:
+result_df = result_df.sort_values('DATE_TIME_DAY').reset_index(drop=True)
 
-# only show the selected ticks
-ax.set_xticks(tick_positions)
-ax.set_xticklabels(
-    df.loc[tick_positions, 'prod_day_start']
-      .dt.strftime('%Y-%m-%d'),
-    rotation=45,
-    ha='right'
-)
-
-ax.set_xlabel('Production day (07:00 – 06:59)')
-ax.set_ylabel('Error (daily average)')
-ax.set_title('Daily mean error (gaps ≥ 2 days compressed)')
-ax.grid(True, axis='y', alpha=.3)
-plt.tight_layout()
-plt.show()
+print(result_df)
