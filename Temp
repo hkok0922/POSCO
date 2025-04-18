@@ -1,30 +1,25 @@
 import pandas as pd
+import numpy as np
 
-# 1) ensure your datetime column is actual datetime
-df['DATE_TIME'] = pd.to_datetime(df['DATE_TIME'])
+# suppose df is your DataFrame
+df = pd.DataFrame({
+    'num1': [1.0, 2.5, 3.1],
+    'num2': [10, 20, 30],
+    'cat': ['a','b','c'],
+    'date': pd.date_range('2025-01-01', periods=3)
+})
 
-# 2) define a “day‐label” that treats 07:00→next 06:59 as one group
-#    by shifting back 7 hours and extracting the date
-df['DATE_TIME_DAY'] = (df['DATE_TIME'] - pd.Timedelta(hours=7)).dt.date
+# Method 1: select all number dtypes
+numeric_df = df.select_dtypes(include=[np.number])
+print(numeric_df)
+#    num1  num2
+# 0   1.0    10
+# 1   2.5    20
+# 2   3.1    30
 
-# 3) for each day, collect the observations and compute log‐likelihood
-rows = []
-for day, grp in df.groupby('DATE_TIME_DAY'):
-    # extract the series or array you want to score; here ‘col’ can be a
-    # single column name or a list of feature‐columns
-    X = grp[col].values.reshape(-1, 1)
-    ll_per_sample = model.score(X) / len(X)
-    # attach the “nominal” day—if you like, shift it *forward* 7 h so it reads 07:00
-    nominal_day = pd.to_datetime(day) + pd.Timedelta(hours=7)
-    rows.append({
-        'DATE_TIME_DAY': nominal_day,
-        'log_likelihood': ll_per_sample
-    })
+# If you just want the list of numeric column names:
+numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+print(numeric_cols)  # ['num1', 'num2']
 
-# 4) build your result DataFrame
-result_df = pd.DataFrame(rows)
-
-# reorder or sort if you want:
-result_df = result_df.sort_values('DATE_TIME_DAY').reset_index(drop=True)
-
-print(result_df)
+# Method 2: use the _get_numeric_data shortcut
+numeric_df2 = df._get_numeric_data()
