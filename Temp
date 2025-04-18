@@ -1,25 +1,31 @@
 import pandas as pd
-import numpy as np
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
-# suppose df is your DataFrame
+# Suppose df is your DataFrame
 df = pd.DataFrame({
-    'num1': [1.0, 2.5, 3.1],
-    'num2': [10, 20, 30],
-    'cat': ['a','b','c'],
-    'date': pd.date_range('2025-01-01', periods=3)
+    'num1': [1.0, 2.0, 3.0],
+    'num2': [10.0, 20.0, 30.0],
+    'cat': ['a', 'b', 'a'],        # <-- we want to leave this alone
+    'date': pd.date_range('2025-01-01', periods=3)  # <-- leave this alone too
 })
 
-# Method 1: select all number dtypes
-numeric_df = df.select_dtypes(include=[np.number])
-print(numeric_df)
-#    num1  num2
-# 0   1.0    10
-# 1   2.5    20
-# 2   3.1    30
+numeric_features = ['num1', 'num2']
+# anything not listed will be passed through untouched
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('scaler', StandardScaler(), numeric_features)
+    ],
+    remainder='passthrough'   # leave all other columns as-is
+)
 
-# If you just want the list of numeric column names:
-numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-print(numeric_cols)  # ['num1', 'num2']
+# Fit+transform
+X_processed = preprocessor.fit_transform(df)
 
-# Method 2: use the _get_numeric_data shortcut
-numeric_df2 = df._get_numeric_data()
+# ColumnTransformer returns a numpy array by default.
+# To get back a DataFrame with meaningful column names:
+out_cols = numeric_features + [c for c in df.columns if c not in numeric_features]
+df_scaled = pd.DataFrame(X_processed, columns=out_cols)
+
+print(df_scaled)
